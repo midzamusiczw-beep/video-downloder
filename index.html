@@ -1,0 +1,345 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Video Downloader</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: Arial, sans-serif;
+    background: linear-gradient(135deg, #0b1120, #172d50);
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+.container {
+    width: 100%;
+    max-width: 550px;
+    padding: 35px;
+    background: #172438;
+    border: 1px solid #34445c;
+    border-radius: 20px;
+    box-shadow: 0 15px 50px #0005;
+    text-align: center;
+}
+
+.logo {
+    font-size: 42px;
+}
+
+h1 {
+    font-size: 29px;
+}
+
+.description {
+    color: #a9b8ce;
+    line-height: 1.6;
+}
+
+input {
+    width: 100%;
+    padding: 16px;
+    margin-top: 22px;
+    background: #0d1728;
+    border: 1px solid #405575;
+    border-radius: 10px;
+    color: white;
+    font-size: 15px;
+}
+
+button {
+    width: 100%;
+    padding: 15px;
+    margin-top: 14px;
+    background: #2878f0;
+    border: none;
+    border-radius: 10px;
+    color: white;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #1763d4;
+}
+
+button:disabled {
+    opacity: 0.6;
+}
+
+video {
+    width: 100%;
+    margin-top: 22px;
+    border-radius: 12px;
+    background: black;
+    display: none;
+}
+
+.progress-container {
+    display: none;
+    margin-top: 20px;
+    background: #34445c;
+    height: 10px;
+    border-radius: 20px;
+    overflow: hidden;
+}
+
+#progress {
+    height: 100%;
+    width: 0%;
+    background: #3988ff;
+    transition: width 0.15s;
+}
+
+#message {
+    margin-top: 18px;
+    font-size: 14px;
+    color: #b7c9df;
+    overflow-wrap: anywhere;
+}
+
+#openLink {
+    display: none;
+    margin-top: 12px;
+    color: #79adff;
+}
+
+footer {
+    margin-top: 30px;
+    color: #8497b1;
+    font-size: 12px;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<div class="logo">▶</div>
+
+<h1>Video Downloader</h1>
+
+<p class="description">
+Paste a direct video URL to preview and download it.
+</p>
+
+<input
+type="url"
+id="videoURL"
+placeholder="Paste your video link here..."
+>
+
+<button onclick="previewVideo()">
+Preview Video
+</button>
+
+<video id="videoPreview" controls></video>
+
+<button id="downloadButton" onclick="downloadVideo()">
+Download Video
+</button>
+
+<div class="progress-container" id="progressContainer">
+<div id="progress"></div>
+</div>
+
+<div id="message"></div>
+
+<a id="openLink" target="_blank" rel="noopener noreferrer">
+Open video directly
+</a>
+
+<footer>
+Only download videos you own or have permission to save.
+<br><br>
+© 2026 Video Downloader
+</footer>
+
+</div>
+
+<script>
+
+const urlInput = document.getElementById("videoURL");
+const preview = document.getElementById("videoPreview");
+const message = document.getElementById("message");
+const progress = document.getElementById("progress");
+const progressContainer = document.getElementById("progressContainer");
+const downloadButton = document.getElementById("downloadButton");
+const openLink = document.getElementById("openLink");
+
+function getVideoURL() {
+
+    try {
+        const url = new URL(urlInput.value.trim());
+
+        if (!["http:", "https:"].includes(url.protocol)) {
+            throw new Error();
+        }
+
+        return url.href;
+
+    } catch {
+        throw new Error("Please enter a valid video URL.");
+    }
+
+}
+
+function previewVideo() {
+
+    try {
+
+        const url = getVideoURL();
+
+        preview.src = url;
+        preview.style.display = "block";
+        preview.load();
+
+        message.textContent = "Video preview requested.";
+
+        openLink.href = url;
+        openLink.style.display = "block";
+
+    } catch (error) {
+
+        message.textContent = error.message;
+
+    }
+
+}
+
+async function downloadVideo() {
+
+    let url;
+
+    try {
+        url = getVideoURL();
+    } catch (error) {
+        message.textContent = error.message;
+        return;
+    }
+
+    downloadButton.disabled = true;
+    progressContainer.style.display = "block";
+    progress.style.width = "0%";
+    message.textContent = "Preparing download...";
+
+    openLink.href = url;
+    openLink.style.display = "block";
+
+    try {
+
+        const response = await fetch(url);
+
+        if (!response.ok) {
+            throw new Error("Download failed.");
+        }
+
+        const type = response.headers.get("content-type") || "";
+
+        if (
+            type &&
+            !type.startsWith("video/") &&
+            !type.includes("octet-stream")
+        ) {
+            throw new Error("URL is not a video file.");
+        }
+
+        if (!response.body) {
+            throw new Error("Video stream unavailable.");
+        }
+
+        const reader = response.body.getReader();
+        const total = Number(response.headers.get("content-length"));
+
+        let received = 0;
+        const chunks = [];
+
+        while (true) {
+
+            const result = await reader.read();
+
+            if (result.done) break;
+
+            chunks.push(result.value);
+            received += result.value.length;
+
+            if (total > 0) {
+
+                const percent = Math.round(
+                    received / total * 100
+                );
+
+                progress.style.width = percent + "%";
+                message.textContent = "Downloading: " + percent + "%";
+
+            } else {
+
+                message.textContent =
+                    "Downloaded " +
+                    (received / 1048576).toFixed(2) +
+                    " MB";
+
+            }
+
+        }
+
+        const blob = new Blob(chunks, {
+            type: type || "application/octet-stream"
+        });
+
+        const objectURL = URL.createObjectURL(blob);
+
+        const filename = new URL(url).pathname
+            .split("/")
+            .pop() || "video.mp4";
+
+        const link = document.createElement("a");
+
+        link.href = objectURL;
+        link.download = filename;
+
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        setTimeout(() => URL.revokeObjectURL(objectURL), 60000);
+
+        progress.style.width = "100%";
+        message.textContent = "Download complete!";
+
+    } catch (error) {
+
+        message.textContent =
+            "Download blocked. The video host may restrict browser access. Try opening the direct video link.";
+
+    } finally {
+
+        downloadButton.disabled = false;
+
+    }
+
+}
+echo "# video-downloader" >> README.md
+git init
+git add README.md
+git commit -m "first commit"
+git branch -M main
+git remote add origin https://github.com/midzamusiczw-beep/video-downloader.git
+git push -u origin main</script>
+
+</body>
+</html>
